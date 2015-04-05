@@ -1,39 +1,61 @@
 var _ = require('lodash');
-var casper = require('casper').create();
+var Spooky = require('spooky');
 
-function Crawler(options) {
-  var defaults = {};
+function Crawler(url, options) {
+  this.callback = [];
 
-  options = _.defaults(options, defaults);
-
-  var Spooky = require('spooky');
-
-  var spooky = new Spooky({
-    child: {
-      transport: 'http'
-    },
-    casper: {
-      logLevel: 'debug',
-      verbose: true
+  var defaults = {
+    url: url,
+    spooky: {
+      child: {
+        transport: 'http'
+      },
+      casper: {
+        logLevel: 'debug',
+        verbose: true
+      }
     }
-  }, function (err) {
+  };
+
+  options = _.defaults(options || {}, defaults);
+  this.options = options;
+
+  this.callback = [];
+
+  var _this = this;
+
+  var spooky = new Spooky(options.spooky, function (err) {
     if (err) {
-      e = new Error('Failed to initialize SpookyJS');
+      var e = new Error('Failed to initialize');
       e.details = err;
       throw e;
     }
 
-    spooky.start(
-      'http://en.wikipedia.org/wiki/Spooky_the_Tuff_Little_Ghost');
-    spooky.then(function () {
-      this.emit('hello', 'Hello, from ' + this.evaluate(function () {
-        return document.title;
-      }));
-    });
+    console.log('Ready to start, ' + options.url);
+
+    spooky.start(options.url);
+
+    for (var i = 0; i < _this.callback.length; i++) {
+      var cb = _this.callback[i];
+      cb(spooky);
+    }
+
     spooky.run();
   });
+
+  this.spooky = spooky;
 }
 
-Crawler.prototype.run = function () {
+Crawler.prototype.on = function (event, callback) {
+  this.spooky.on(event, callback);
 
+  return this;
 };
+
+Crawler.prototype.do = function (callback) {
+  this.callback.push(callback);
+
+  return this;
+};
+
+module.exports = Crawler;
